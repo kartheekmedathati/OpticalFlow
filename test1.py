@@ -4,7 +4,7 @@ from kivy.uix.boxlayout import BoxLayout
 import matplotlib.pyplot as plt
 
 plt.plot([1, 23, 2, 4])
-plt.ylabel('Toying zdsafwith git workflow!')
+plt.ylabel('Toying zdsadsf afwith git workflow!')
 
 class MyApp(App):
 
