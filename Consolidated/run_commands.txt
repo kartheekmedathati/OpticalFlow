@@ -1,0 +1,32 @@
+
+python main.py --inference --model FlowNet2 --save_flow --inference_dataset MpiSintelClean \
+--inference_dataset_root  /home/MedathatiExt/OpticalFlow/Data/MPISintel/training/\
+--resume /path/to/checkpoints
+
+
+
+
+python main.py --batch_size 8 --total_epochs 10 --model FlowNet2 --loss=L1Loss --optimizer=Adam --optimizer_lr=1e-4 \
+--training_dataset MpiSintelFinal --training_dataset_root /home/MedathatiExt/OpticalFlow/Data/MPISintel/training/  \
+--validation_dataset MpiSintelClean --validation_dataset_root /home/MedathatiExt/OpticalFlow/Data/MPISintel/training/
+
+
+python main.py --batch_size 8 --model FlowNet2 --loss=L1Loss --optimizer=Adam --optimizer_lr=1e-4 \
+--training_dataset MpiSintelFinal --training_dataset_root /home/MedathatiExt/OpticalFlow/Data/MPISintel/training/  \
+--validation_dataset MpiSintelClean --validation_dataset_root /home/MedathatiExt/OpticalFlow/Data/MPISintel/training/
+
+
+
+python main.py --batch_size 8 --total_epochs 50 --model FlowNet2 --loss=L1Loss --optimizer=Adam --optimizer_lr=1e-4 \
+--training_dataset Wallach --training_dataset_root /home/MedathatiExt/OpticalFlow/Stimuli/Wallach_dataset/moving_circle_full_r42_c255_GT/  \
+--validation_dataset Wallach --validation_dataset_root /home/MedathatiExt/OpticalFlow/Stimuli/Wallach_dataset/moving_circle_full_r21_c255_GT/ \
+--resume /home/MedathatiExt/OpticalFlow/trainable/AlexHall/flownet2-pytorch/flownet_models/FlowNet2_checkpoint.pth.tar \
+-s ./Model_Wallach_Using_Pretrained
+
+home/MedathatiExt/OpticalFlow/Stimuli/Wallach_dataset/moving_circle_full_r42_c255_GT
+
+
+python main.py --batch_size 8 --total_epochs 10 --model FlowNet2 --loss=L1Loss --optimizer=Adam --optimizer_lr=1e-4 \
+--training_dataset Wallach --training_dataset_root /home/MedathatiExt/OpticalFlow/Stimuli/Wallach_dataset/  \
+--validation_dataset Wallach --validation_dataset_root /home/MedathatiExt/OpticalFlow/Stimuli/Wallach_dataset/ \
+-s ./Model_Wallach_trainingset_full
