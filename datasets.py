@@ -146,6 +146,9 @@ class Wallach(data.Dataset):
             fbase = file[len(flow_root)+1:]
             fprefix = fbase[:-6]
             fnum = int(fbase[-6:-4])
+            head, tail = os.path.split(fprefix)
+            fprefix = head[:-2] + "images/"
+            fprefix  = fprefix + tail
             # print("-*-")
             #print("File base: ",flow_root)
             #print("fprefix: ",fprefix)
