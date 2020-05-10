@@ -1,0 +1,21 @@
+#t Interactive Research Tool for Optical flow and Perception Research
+#n /run/media/medathati/4TBInt/MedathatiExt/Work/OpticalFlow/Code/InteractiveResearchTool/data_parser.py
+#
+#
+#
+# Naga Venkata Kartheek Medathati
+# April 27th 2020
+# mnvhere@gmail.com
+
+appName: InteractiveResearchTool
+
+base_dir: &base /run/media/medathati/4TBInt/MedathatiExt/Work/OpticalFlow/
+docker: dockerImage
+launcher: script_to_launch
+
+
+
+
+
+
+
