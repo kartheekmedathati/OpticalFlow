@@ -4,6 +4,7 @@
 - [https://nanonets.com/blog/optical-flow/](https://nanonets.com/blog/optical-flow/)
 
 ## Applications
+ - [What is Optical flow for? Workshop Summary/Results](https://openaccess.thecvf.com/content_ECCVW_2018/papers/11134/Guney_What_Is_Optical_Flow_for_Workshop_Results_and_Summary_ECCVW_2018_paper.pdf)
  - Applications of optical flow 
  - [Computer vision for autonomous vehicles](https://www.nowpublishers.com/article/Details/CGV-079)
  
