@@ -47,3 +47,4 @@
 ## Training Recurrent Neural Networks
 - [nnRNN](https://papers.nips.cc/paper/9513-non-normal-recurrent-neural-network-nnrnn-learning-long-time-dependencies-while-improving-expressivity-with-transient-dynamics.pdf)
 - [Learning parametric filter kernels](On Learning Interpretable CNNs with Parametric Modulated Kernel-based Filters)
+- [Gabor Net](https://arxiv.org/abs/1904.13204)
