@@ -52,7 +52,7 @@
 
 
 ## Variants of flow estimation
-= [Non rigid optical flow](https://arxiv.org/pdf/1603.08120.pdf)
+- [Non rigid optical flow](https://arxiv.org/pdf/1603.08120.pdf)
 - [Unsupervised learning of Multi frame flow](https://arxiv.org/pdf/1603.08120.pdf)
 
 
