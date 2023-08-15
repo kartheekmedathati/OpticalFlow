@@ -39,6 +39,7 @@
 ## From Neuroscience side
 - Motion illusions as optimal percepts
 - http://neuralensemble.org/MotionClouds/index.html
+- https://senselab.med.yale.edu/modeldb/showModel.cshtml?model=181035#tabs-1
 
 ## Efficient implementations
 - [Highly efficient GPU](https://link.springer.com/chapter/10.1007/978-3-642-35740-4_29)
