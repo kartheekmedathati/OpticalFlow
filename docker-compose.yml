@@ -1,0 +1,40 @@
+services:
+  # Generate sample images for each stimulus type
+  samples:
+    build: .
+    command: python generate_samples.py
+    volumes:
+      - ./samples:/app/samples
+      - ./output:/data/output
+
+  # Generate the full dataset (all stimulus types, all velocities)
+  generate:
+    build: .
+    command: python GenerateStimuli_main.py
+    volumes:
+      - ./output:/data/output
+    environment:
+      - OUTPUT_DIR=/data/output
+
+  # Evaluate predictions against ground truth
+  evaluate:
+    build: .
+    command: >
+      python evaluate.py
+        --predictions_dir /data/predictions
+        --gt_dir /data/gt
+        --method_name ${METHOD_NAME:-MyMethod}
+    volumes:
+      - ./predictions:/data/predictions:ro
+      - ./output:/data/gt:ro
+
+  # Interactive development shell
+  dev:
+    build: .
+    command: /bin/bash
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/app
+      - ./output:/data/output
+      - ./samples:/app/samples
