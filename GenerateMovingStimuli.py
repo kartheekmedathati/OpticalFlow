@@ -499,6 +499,374 @@ def GenerateMovingHybridPlaids(Height,Width,Radius, frequencies, orientations, o
 #                         flow_write(gt_flo_name, flow_gt_current[0,:,:], flow_gt_current[1,:,:])
 #             toc
 
+def GenerateMovingBarberPole(Height, Width, rect_length, rect_width, frequencies, orientations, aperture_orientations, Results_base_dir):
+    """Generate barber pole stimuli: a grating viewed through an elongated rectangular aperture.
+
+    The barber pole illusion: a grating's perceived motion shifts toward the long axis
+    of the aperture. Ground truth provides both the component velocity (normal to grating)
+    and the barber-pole-predicted velocity (along aperture long axis).
+
+    For each grating, we store:
+      - Layer 0 (component): velocity normal to the grating orientation
+      - Layer 1 (barberpole): velocity along the aperture's long axis, with magnitude
+        equal to speed / cos(angle between grating normal and aperture axis)
+    """
+    contrastvalue = np.random.randint(10, 255, 1)[0]
+    stimulustype = 'barberpole_l'+str(rect_length)+'_w'+str(rect_width)+'_c'+str(contrastvalue)
+    Results_dir = os.path.join(Results_base_dir, stimulustype+'_images/')
+    Results_GT_dir = os.path.join(Results_base_dir, stimulustype+'_GT/')
+    Results_GT_bp_dir = os.path.join(Results_base_dir, stimulustype+'_GT_barberpole/')
+    if not os.path.exists(os.path.dirname(Results_dir)):
+        os.makedirs(os.path.dirname(Results_dir))
+    if not os.path.exists(os.path.dirname(Results_GT_dir)):
+        os.makedirs(os.path.dirname(Results_GT_dir))
+    if not os.path.exists(os.path.dirname(Results_GT_bp_dir)):
+        os.makedirs(os.path.dirname(Results_GT_bp_dir))
+
+    for stimfreq in frequencies:
+        for grating_orient in orientations:
+            vel_tsample = np.logspace(0, np.log10(0.5/stimfreq), 8, endpoint=True)
+            vel_sample = np.round(np.concatenate((-1*vel_tsample[::-1], [0], vel_tsample), axis=0))
+            for current_speed in vel_sample:
+                for aper_orient in aperture_orientations:
+                    a = GenerateGrating(Height, Width, stimfreq, grating_orient, current_speed)
+                    for index, dispfactor in enumerate([-2, -1, 0, 1, 2]):
+                        current_frame = np.zeros([Height, Width], dtype=np.float64)
+                        flow_gt_component = np.zeros([2, Height, Width], dtype=np.float64)
+                        flow_gt_barberpole = np.zeros([2, Height, Width], dtype=np.float64)
+
+                        # Rectangular aperture centered on image, rotated by aper_orient
+                        half_l = rect_length / 2.0
+                        half_w = rect_width / 2.0
+                        cos_a = np.cos(np.deg2rad(-aper_orient))
+                        sin_a = np.sin(np.deg2rad(-aper_orient))
+                        cy, cx = Height//2 - 1, Width//2 - 1
+                        corners_x = np.array([-half_l, half_l, half_l, -half_l])
+                        corners_y = np.array([-half_w, -half_w, half_w, half_w])
+                        rot_x = corners_x * cos_a - corners_y * sin_a + cx
+                        rot_y = corners_x * sin_a + corners_y * cos_a + cy
+                        mask = np.zeros([Height, Width], dtype=np.uint8)
+                        pts = np.array(list(zip(rot_x.astype(int), rot_y.astype(int))), dtype=np.int32)
+                        cv2.fillPoly(mask, [pts], 255)
+                        tyc, txc = np.where(mask > 0)
+
+                        current_frame[tyc, txc] = contrastvalue * a[tyc, txc, index]
+
+                        # Component velocity (normal to grating)
+                        comp_vx = current_speed * np.cos(np.deg2rad(grating_orient))
+                        comp_vy = -1 * current_speed * np.sin(np.deg2rad(grating_orient))
+                        flow_gt_component[0, tyc, txc] = comp_vx
+                        flow_gt_component[1, tyc, txc] = comp_vy
+
+                        # Barber pole velocity: project onto aperture long axis
+                        # Aperture long axis direction
+                        ax_x = np.cos(np.deg2rad(aper_orient))
+                        ax_y = -np.sin(np.deg2rad(aper_orient))
+                        # Speed along aperture axis = component_speed / cos(angle_between)
+                        angle_diff = np.deg2rad(grating_orient - aper_orient)
+                        cos_diff = np.cos(angle_diff)
+                        if abs(cos_diff) > 1e-6:
+                            bp_speed = current_speed / cos_diff
+                        else:
+                            bp_speed = 0  # grating parallel to aperture axis
+                        flow_gt_barberpole[0, tyc, txc] = bp_speed * ax_x
+                        flow_gt_barberpole[1, tyc, txc] = bp_speed * ax_y
+
+                        VX_c = np.round(comp_vx)
+                        VY_c = np.round(comp_vy)
+                        I_flow_comp = viz_flow(flow_gt_component[0,:,:], flow_gt_component[1,:,:])
+                        I_flow_bp = viz_flow(flow_gt_barberpole[0,:,:], flow_gt_barberpole[1,:,:])
+
+                        name_base = stimulustype + '_freq_'+str(np.round(stimfreq,4)) + \
+                            '_gorient_'+str(grating_orient)+'_aorient_'+str(aper_orient) + \
+                            '_VX_'+str(VX_c).zfill(4)+'_VY_'+str(VY_c).zfill(4)+'__'+str(index).zfill(2)
+                        img_name = os.path.join(Results_dir, name_base+'.png')
+                        gt_comp_flo = os.path.join(Results_GT_dir, name_base+'.flo')
+                        gt_comp_vis = os.path.join(Results_GT_dir, name_base+'.png')
+                        gt_bp_flo = os.path.join(Results_GT_bp_dir, name_base+'.flo')
+                        gt_bp_vis = os.path.join(Results_GT_bp_dir, name_base+'.png')
+
+                        cv2.imwrite(img_name, cv2.cvtColor(current_frame.astype('uint8'), cv2.COLOR_GRAY2RGB))
+                        if index < 4:
+                            cv2.imwrite(gt_comp_vis, cv2.cvtColor(I_flow_comp, cv2.COLOR_RGB2BGR))
+                            flow_write(gt_comp_flo, flow_gt_component[0,:,:], flow_gt_component[1,:,:])
+                            cv2.imwrite(gt_bp_vis, cv2.cvtColor(I_flow_bp, cv2.COLOR_RGB2BGR))
+                            flow_write(gt_bp_flo, flow_gt_barberpole[0,:,:], flow_gt_barberpole[1,:,:])
+
+
+def GenerateMovingBarberPlaid(Height, Width, rect_length, rect_width, frequencies, orientations, orientation_offset, aperture_orientations, Results_base_dir):
+    """Generate barber plaid stimuli: a plaid pattern viewed through an elongated rectangular aperture.
+
+    Combines the IoC computation of plaids with the aperture geometry of barber poles.
+    Ground truth provides:
+      - Layer 0 (IoC): the intersection-of-constraints velocity
+      - Layer 1 (barberpole): velocity biased along the aperture's long axis
+    """
+    contrastvalue = np.random.randint(10, 255, 1)[0]
+    stimulustype = 'barberplaid_l'+str(rect_length)+'_w'+str(rect_width)+'_c'+str(contrastvalue)
+    Results_dir = os.path.join(Results_base_dir, stimulustype+'_images/')
+    Results_GT_dir = os.path.join(Results_base_dir, stimulustype+'_GT/')
+    Results_GT_bp_dir = os.path.join(Results_base_dir, stimulustype+'_GT_barberpole/')
+    for d in [Results_dir, Results_GT_dir, Results_GT_bp_dir]:
+        if not os.path.exists(os.path.dirname(d)):
+            os.makedirs(os.path.dirname(d))
+
+    for stimfreqies in itertools.combinations(frequencies, 2):
+        for orientations_iter in itertools.product(orientations, orientation_offset):
+            current_orientations = np.asarray(orientations_iter)
+            current_orientations[1] = current_orientations[1] + current_orientations[0]
+            vel_sample = np.logspace(0, np.log10(0.5/np.max((stimfreqies[0], stimfreqies[1]))), 8, endpoint=True)
+
+            for current_speeds in itertools.combinations(vel_sample, 2):
+                for aper_orient in aperture_orientations:
+                    a = GeneratePlaid(Height, Width, stimfreqies[0], current_orientations[0], current_speeds[0],
+                                      stimfreqies[1], current_orientations[1], current_speeds[1])
+                    for index, dispfactor in enumerate([-2, -1, 0, 1, 2]):
+                        current_frame = np.zeros([Height, Width], dtype=np.float64)
+                        flow_gt_ioc = np.zeros([2, Height, Width], dtype=np.float64)
+                        flow_gt_bp = np.zeros([2, Height, Width], dtype=np.float64)
+
+                        # Rectangular aperture
+                        half_l = rect_length / 2.0
+                        half_w = rect_width / 2.0
+                        cos_a = np.cos(np.deg2rad(-aper_orient))
+                        sin_a = np.sin(np.deg2rad(-aper_orient))
+                        cy, cx = Height//2 - 1, Width//2 - 1
+                        corners_x = np.array([-half_l, half_l, half_l, -half_l])
+                        corners_y = np.array([-half_w, -half_w, half_w, half_w])
+                        rot_x = corners_x * cos_a - corners_y * sin_a + cx
+                        rot_y = corners_x * sin_a + corners_y * cos_a + cy
+                        mask = np.zeros([Height, Width], dtype=np.uint8)
+                        pts = np.array(list(zip(rot_x.astype(int), rot_y.astype(int))), dtype=np.int32)
+                        cv2.fillPoly(mask, [pts], 255)
+                        tyc, txc = np.where(mask > 0)
+
+                        current_frame[tyc, txc] = contrastvalue * a[tyc, txc, index]
+
+                        # IoC velocity
+                        if current_speeds[0] == current_speeds[1]:
+                            ioc_vx = 0.5*((current_speeds[0]*np.cos(np.deg2rad(current_orientations[0]))) + (current_speeds[1]*np.cos(np.deg2rad(current_orientations[1]))))
+                            ioc_vy = -1*0.5*((current_speeds[0]*np.sin(np.deg2rad(current_orientations[0]))) + (current_speeds[1]*np.sin(np.deg2rad(current_orientations[1]))))
+                        else:
+                            denom = np.sin(np.deg2rad(current_orientations[1]) - np.deg2rad(current_orientations[0]))
+                            ioc_vx = (current_speeds[0]*np.sin(np.deg2rad(current_orientations[1])) - current_speeds[1]*np.sin(np.deg2rad(current_orientations[0]))) / denom
+                            ioc_vy = -1*(current_speeds[0]*np.cos(np.deg2rad(current_orientations[1])) - current_speeds[1]*np.cos(np.deg2rad(current_orientations[0]))) / np.sin(np.deg2rad(current_orientations[0]) - np.deg2rad(current_orientations[1]))
+
+                        flow_gt_ioc[0, tyc, txc] = ioc_vx
+                        flow_gt_ioc[1, tyc, txc] = ioc_vy
+
+                        # Barber pole: project IoC velocity onto aperture long axis
+                        ax_x = np.cos(np.deg2rad(aper_orient))
+                        ax_y = -np.sin(np.deg2rad(aper_orient))
+                        proj = ioc_vx * ax_x + ioc_vy * ax_y
+                        flow_gt_bp[0, tyc, txc] = proj * ax_x
+                        flow_gt_bp[1, tyc, txc] = proj * ax_y
+
+                        VX = np.round(ioc_vx)
+                        VY = np.round(ioc_vy)
+                        I_flow_ioc = viz_flow(flow_gt_ioc[0,:,:], flow_gt_ioc[1,:,:])
+                        I_flow_bp = viz_flow(flow_gt_bp[0,:,:], flow_gt_bp[1,:,:])
+
+                        name_base = stimulustype + '_cyc_'+str(np.round(stimfreqies[0],4))+'_'+str(np.round(stimfreqies[1],4)) + \
+                            '_orient_'+str(current_orientations[0])+'_'+str(current_orientations[1]) + \
+                            '_aorient_'+str(aper_orient) + \
+                            '_VX_'+str(VX).zfill(4)+'_VY_'+str(VY).zfill(4)+'__'+str(index).zfill(2)
+                        img_name = os.path.join(Results_dir, name_base+'.png')
+                        gt_ioc_flo = os.path.join(Results_GT_dir, name_base+'.flo')
+                        gt_ioc_vis = os.path.join(Results_GT_dir, name_base+'.png')
+                        gt_bp_flo = os.path.join(Results_GT_bp_dir, name_base+'.flo')
+                        gt_bp_vis = os.path.join(Results_GT_bp_dir, name_base+'.png')
+
+                        cv2.imwrite(img_name, cv2.cvtColor(current_frame.astype('uint8'), cv2.COLOR_GRAY2RGB))
+                        if index < 4:
+                            cv2.imwrite(gt_ioc_vis, cv2.cvtColor(I_flow_ioc, cv2.COLOR_RGB2BGR))
+                            flow_write(gt_ioc_flo, flow_gt_ioc[0,:,:], flow_gt_ioc[1,:,:])
+                            cv2.imwrite(gt_bp_vis, cv2.cvtColor(I_flow_bp, cv2.COLOR_RGB2BGR))
+                            flow_write(gt_bp_flo, flow_gt_bp[0,:,:], flow_gt_bp[1,:,:])
+
+
+def GenerateTransparentMotion(Height, Width, num_dots, dot_radius, speed_pairs, direction_pairs, Results_base_dir):
+    """Generate transparent motion stimuli: two overlapping dot surfaces moving in different directions.
+
+    Two populations of random dots occupy the same spatial region, each moving coherently
+    in a different direction. The visual system segments them into two transparent surfaces.
+
+    Ground truth provides two flow layers:
+      - Layer 0: flow for surface 1
+      - Layer 1: flow for surface 2
+    Plus a surface-membership mask indicating which dots belong to which surface.
+    """
+    stimulustype = 'transparent_ndots_'+str(num_dots)+'_r'+str(dot_radius)
+    Results_dir = os.path.join(Results_base_dir, stimulustype+'_images/')
+    Results_GT_s1_dir = os.path.join(Results_base_dir, stimulustype+'_GT_surface1/')
+    Results_GT_s2_dir = os.path.join(Results_base_dir, stimulustype+'_GT_surface2/')
+    Results_mask_dir = os.path.join(Results_base_dir, stimulustype+'_masks/')
+    for d in [Results_dir, Results_GT_s1_dir, Results_GT_s2_dir, Results_mask_dir]:
+        if not os.path.exists(os.path.dirname(d)):
+            os.makedirs(os.path.dirname(d))
+
+    np.random.seed(42)
+    margin = 80  # keep dots away from border to avoid clipping at max displacement
+    contrastvalue = 200
+
+    for speed1, speed2 in speed_pairs:
+        for dir1, dir2 in direction_pairs:
+            vx1 = speed1 * np.cos(np.deg2rad(dir1))
+            vy1 = -speed1 * np.sin(np.deg2rad(dir1))
+            vx2 = speed2 * np.cos(np.deg2rad(dir2))
+            vy2 = -speed2 * np.sin(np.deg2rad(dir2))
+
+            # Generate random dot positions (shared across temporal frames via displacement)
+            half_dots = num_dots // 2
+            # Surface 1 dot centers
+            cx_s1 = np.random.randint(margin, Width - margin, half_dots)
+            cy_s1 = np.random.randint(margin, Height - margin, half_dots)
+            # Surface 2 dot centers
+            cx_s2 = np.random.randint(margin, Width - margin, half_dots)
+            cy_s2 = np.random.randint(margin, Height - margin, half_dots)
+
+            for index, dispfactor in enumerate([-2, -1, 0, 1, 2]):
+                current_frame = np.zeros([Height, Width], dtype=np.float64)
+                flow_gt_s1 = np.zeros([2, Height, Width], dtype=np.float64)
+                flow_gt_s2 = np.zeros([2, Height, Width], dtype=np.float64)
+                surface_mask = np.zeros([Height, Width], dtype=np.uint8)  # 1=surface1, 2=surface2
+
+                # Draw surface 1 dots
+                for i in range(half_dots):
+                    dx = int(round(vx1 * dispfactor))
+                    dy = int(round(vy1 * dispfactor))
+                    x = cx_s1[i] + dx
+                    y = cy_s1[i] + dy
+                    if 0 <= x < Width and 0 <= y < Height:
+                        cv2.circle(current_frame, (x, y), dot_radius, contrastvalue, -1)
+                        # Mark flow for this dot's pixels
+                        dot_mask = np.zeros([Height, Width], dtype=np.uint8)
+                        cv2.circle(dot_mask, (x, y), dot_radius, 255, -1)
+                        dy_px, dx_px = np.where(dot_mask > 0)
+                        flow_gt_s1[0, dy_px, dx_px] = vx1
+                        flow_gt_s1[1, dy_px, dx_px] = vy1
+                        surface_mask[dy_px, dx_px] = 1
+
+                # Draw surface 2 dots (with different intensity for visualization)
+                for i in range(half_dots):
+                    dx = int(round(vx2 * dispfactor))
+                    dy = int(round(vy2 * dispfactor))
+                    x = cx_s2[i] + dx
+                    y = cy_s2[i] + dy
+                    if 0 <= x < Width and 0 <= y < Height:
+                        cv2.circle(current_frame, (x, y), dot_radius, contrastvalue * 0.6, -1)
+                        dot_mask = np.zeros([Height, Width], dtype=np.uint8)
+                        cv2.circle(dot_mask, (x, y), dot_radius, 255, -1)
+                        dy_px, dx_px = np.where(dot_mask > 0)
+                        flow_gt_s2[0, dy_px, dx_px] = vx2
+                        flow_gt_s2[1, dy_px, dx_px] = vy2
+                        surface_mask[dy_px, dx_px] = 2
+
+                VX1 = np.round(vx1)
+                VY1 = np.round(vy1)
+                VX2 = np.round(vx2)
+                VY2 = np.round(vy2)
+
+                I_flow_s1 = viz_flow(flow_gt_s1[0,:,:], flow_gt_s1[1,:,:])
+                I_flow_s2 = viz_flow(flow_gt_s2[0,:,:], flow_gt_s2[1,:,:])
+
+                name_base = stimulustype + \
+                    '_dir1_'+str(dir1)+'_spd1_'+str(speed1) + \
+                    '_dir2_'+str(dir2)+'_spd2_'+str(speed2) + \
+                    '__'+str(index).zfill(2)
+                img_name = os.path.join(Results_dir, name_base+'.png')
+                gt_s1_flo = os.path.join(Results_GT_s1_dir, name_base+'.flo')
+                gt_s1_vis = os.path.join(Results_GT_s1_dir, name_base+'.png')
+                gt_s2_flo = os.path.join(Results_GT_s2_dir, name_base+'.flo')
+                gt_s2_vis = os.path.join(Results_GT_s2_dir, name_base+'.png')
+                mask_name = os.path.join(Results_mask_dir, name_base+'.png')
+
+                cv2.imwrite(img_name, cv2.cvtColor(current_frame.astype('uint8'), cv2.COLOR_GRAY2RGB))
+                cv2.imwrite(mask_name, surface_mask * 127)  # 0=bg, 127=s1, 254=s2
+                if index < 4:
+                    cv2.imwrite(gt_s1_vis, cv2.cvtColor(I_flow_s1, cv2.COLOR_RGB2BGR))
+                    flow_write(gt_s1_flo, flow_gt_s1[0,:,:], flow_gt_s1[1,:,:])
+                    cv2.imwrite(gt_s2_vis, cv2.cvtColor(I_flow_s2, cv2.COLOR_RGB2BGR))
+                    flow_write(gt_s2_flo, flow_gt_s2[0,:,:], flow_gt_s2[1,:,:])
+
+
+def GenerateTransparentGratings(Height, Width, Radius, frequencies, orientations, orientation_offset, Results_base_dir):
+    """Generate transparent motion with overlapping gratings moving in different directions.
+
+    Two gratings at different orientations/speeds are superimposed within a circular aperture,
+    but unlike plaids (where IoC yields a single coherent velocity), here the ground truth
+    preserves each grating's component velocity as a separate layer.
+
+    This tests whether a method can decompose the motion into two transparent surfaces
+    rather than computing a single averaged/IoC velocity.
+    """
+    contrastvalue = np.random.randint(10, 255, 1)[0]
+    stimulustype = 'transparent_gratings_R_'+str(Radius)+'_c'+str(contrastvalue)
+    Results_dir = os.path.join(Results_base_dir, stimulustype+'_images/')
+    Results_GT_s1_dir = os.path.join(Results_base_dir, stimulustype+'_GT_surface1/')
+    Results_GT_s2_dir = os.path.join(Results_base_dir, stimulustype+'_GT_surface2/')
+    Results_GT_ioc_dir = os.path.join(Results_base_dir, stimulustype+'_GT_ioc/')
+    for d in [Results_dir, Results_GT_s1_dir, Results_GT_s2_dir, Results_GT_ioc_dir]:
+        if not os.path.exists(os.path.dirname(d)):
+            os.makedirs(os.path.dirname(d))
+
+    for stimfreqies in itertools.combinations(frequencies, 2):
+        for orientations_iter in itertools.product(orientations, orientation_offset):
+            current_orientations = np.asarray(orientations_iter)
+            current_orientations[1] = current_orientations[1] + current_orientations[0]
+            vel_sample = np.logspace(0, np.log10(0.5/np.max((stimfreqies[0], stimfreqies[1]))), 8, endpoint=True)
+
+            for current_speeds in itertools.combinations(vel_sample, 2):
+                g1 = GenerateGrating(Height, Width, stimfreqies[0], current_orientations[0], current_speeds[0])
+                g2 = GenerateGrating(Height, Width, stimfreqies[1], current_orientations[1], current_speeds[1])
+
+                for index, dispfactor in enumerate([-2, -1, 0, 1, 2]):
+                    current_frame = np.zeros([Height, Width], dtype=np.float64)
+                    flow_gt_s1 = np.zeros([2, Height, Width], dtype=np.float64)
+                    flow_gt_s2 = np.zeros([2, Height, Width], dtype=np.float64)
+                    flow_gt_ioc = np.zeros([2, Height, Width], dtype=np.float64)
+
+                    tyc, txc = draw.circle(Height//2-1, Width//2-1, radius=Radius, shape=current_frame.shape)
+                    current_frame[tyc, txc] = contrastvalue * (0.5*g1[tyc, txc, index] + 0.5*g2[tyc, txc, index])
+
+                    # Surface 1: component velocity of grating 1
+                    flow_gt_s1[0, tyc, txc] = current_speeds[0] * np.cos(np.deg2rad(current_orientations[0]))
+                    flow_gt_s1[1, tyc, txc] = -1 * current_speeds[0] * np.sin(np.deg2rad(current_orientations[0]))
+
+                    # Surface 2: component velocity of grating 2
+                    flow_gt_s2[0, tyc, txc] = current_speeds[1] * np.cos(np.deg2rad(current_orientations[1]))
+                    flow_gt_s2[1, tyc, txc] = -1 * current_speeds[1] * np.sin(np.deg2rad(current_orientations[1]))
+
+                    # IoC velocity (for comparison)
+                    if current_speeds[0] == current_speeds[1]:
+                        flow_gt_ioc[0, tyc, txc] = 0.5*((current_speeds[0]*np.cos(np.deg2rad(current_orientations[0]))) + (current_speeds[1]*np.cos(np.deg2rad(current_orientations[1]))))
+                        flow_gt_ioc[1, tyc, txc] = -1*0.5*((current_speeds[0]*np.sin(np.deg2rad(current_orientations[0]))) + (current_speeds[1]*np.sin(np.deg2rad(current_orientations[1]))))
+                    else:
+                        denom = np.sin(np.deg2rad(current_orientations[1]) - np.deg2rad(current_orientations[0]))
+                        flow_gt_ioc[0, tyc, txc] = (current_speeds[0]*np.sin(np.deg2rad(current_orientations[1])) - current_speeds[1]*np.sin(np.deg2rad(current_orientations[0]))) / denom
+                        flow_gt_ioc[1, tyc, txc] = -1*(current_speeds[0]*np.cos(np.deg2rad(current_orientations[1])) - current_speeds[1]*np.cos(np.deg2rad(current_orientations[0]))) / np.sin(np.deg2rad(current_orientations[0]) - np.deg2rad(current_orientations[1]))
+
+                    I_flow_s1 = viz_flow(flow_gt_s1[0,:,:], flow_gt_s1[1,:,:])
+                    I_flow_s2 = viz_flow(flow_gt_s2[0,:,:], flow_gt_s2[1,:,:])
+                    I_flow_ioc = viz_flow(flow_gt_ioc[0,:,:], flow_gt_ioc[1,:,:])
+
+                    VX_ioc = np.round(flow_gt_ioc[0, tyc[0], txc[0]])
+                    VY_ioc = np.round(flow_gt_ioc[1, tyc[0], txc[0]])
+                    name_base = stimulustype + '_cyc_'+str(np.round(stimfreqies[0],4))+'_'+str(np.round(stimfreqies[1],4)) + \
+                        '_orient_'+str(current_orientations[0])+'_'+str(current_orientations[1]) + \
+                        '_VX_'+str(VX_ioc).zfill(4)+'_VY_'+str(VY_ioc).zfill(4)+'__'+str(index).zfill(2)
+
+                    img_name = os.path.join(Results_dir, name_base+'.png')
+                    cv2.imwrite(img_name, cv2.cvtColor(current_frame.astype('uint8'), cv2.COLOR_GRAY2RGB))
+                    if index < 4:
+                        for gt_dir, flow_arr, flow_vis in [
+                            (Results_GT_s1_dir, flow_gt_s1, I_flow_s1),
+                            (Results_GT_s2_dir, flow_gt_s2, I_flow_s2),
+                            (Results_GT_ioc_dir, flow_gt_ioc, I_flow_ioc)]:
+                            cv2.imwrite(os.path.join(gt_dir, name_base+'.png'), cv2.cvtColor(flow_vis, cv2.COLOR_RGB2BGR))
+                            flow_write(os.path.join(gt_dir, name_base+'.flo'), flow_arr[0,:,:], flow_arr[1,:,:])
+
+
 def GenerateMovingGratings(Height,Width,Radius, orientations, Results_base_dir):
     xc = Width/2 -1
     yc = Height/2-1

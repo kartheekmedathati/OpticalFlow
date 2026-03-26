@@ -128,8 +128,81 @@ if __name__ == '__main__':
 
     GenerateMovingHybridPlaids(cfg['im_size']['Height'], cfg['im_size']['Width'],cfg['plaids']['params']['aperture_radii'][0],cfg['plaids']['params']['frequencies '],orientations, orientation_offset,cfg['hybridplaids']['params']['gratings_offset'], cfg['base_dir'])
 
+    '''Barber Poles'''
+    bp_rect_lengths = [200, 300]
+    bp_rect_widths = [40, 60]
+    bp_frequencies = [1.0/10, 1.0/20, 1.0/30]
+    bp_grating_orientations = np.linspace(0, 180, 7)[:-1]
+    bp_aperture_orientations = [0, 45, 90, 135]
+    cfg['barberpoles'] = {'params': {
+        'rect_lengths': bp_rect_lengths,
+        'rect_widths': bp_rect_widths,
+        'frequencies': bp_frequencies,
+        'grating_orientations': list(bp_grating_orientations),
+        'aperture_orientations': bp_aperture_orientations
+    }}
+
+    for rl in bp_rect_lengths:
+        for rw in bp_rect_widths:
+            print("Generating barber poles with length=%d, width=%d" % (rl, rw))
+            GenerateMovingBarberPole(Height, Width, rl, rw, bp_frequencies,
+                                     bp_grating_orientations, bp_aperture_orientations, cfg['base_dir'])
+
+    '''Barber Plaids'''
+    bp_orientation_offset = np.linspace(30.0, 90.0, 5)
+    bp_orientation_offset = bp_orientation_offset[np.nonzero(bp_orientation_offset)]
+    cfg['barberplaids'] = {'params': {
+        'rect_lengths': bp_rect_lengths,
+        'rect_widths': bp_rect_widths,
+        'frequencies': bp_frequencies,
+        'orientations': list(bp_grating_orientations),
+        'orientation_offset': list(bp_orientation_offset),
+        'aperture_orientations': bp_aperture_orientations
+    }}
+
+    for rl in bp_rect_lengths:
+        for rw in bp_rect_widths:
+            print("Generating barber plaids with length=%d, width=%d" % (rl, rw))
+            GenerateMovingBarberPlaid(Height, Width, rl, rw, bp_frequencies,
+                                      bp_grating_orientations, bp_orientation_offset,
+                                      bp_aperture_orientations, cfg['base_dir'])
+
+    '''Transparent Motion (Random Dots)'''
+    tm_num_dots = [200, 400]
+    tm_dot_radii = [2, 4]
+    tm_speed_pairs = [(3, 5), (5, 5), (3, 10), (8, 8)]
+    tm_direction_pairs = [(0, 180), (0, 90), (45, 225), (30, 150), (0, 120), (60, 300)]
+    cfg['transparent_dots'] = {'params': {
+        'num_dots': tm_num_dots,
+        'dot_radii': tm_dot_radii,
+        'speed_pairs': tm_speed_pairs,
+        'direction_pairs': tm_direction_pairs
+    }}
+
+    for nd in tm_num_dots:
+        for dr in tm_dot_radii:
+            print("Generating transparent motion dots with n=%d, r=%d" % (nd, dr))
+            GenerateTransparentMotion(Height, Width, nd, dr, tm_speed_pairs,
+                                      tm_direction_pairs, cfg['base_dir'])
+
+    '''Transparent Motion (Overlapping Gratings)'''
+    tg_frequencies = [1.0/10, 1.0/20, 1.0/30]
+    tg_orientations = np.linspace(0, 180, 7)[:-1]
+    tg_orientation_offset = np.linspace(30.0, 90.0, 5)
+    tg_orientation_offset = tg_orientation_offset[np.nonzero(tg_orientation_offset)]
+    tg_radius = 100
+    cfg['transparent_gratings'] = {'params': {
+        'frequencies': tg_frequencies,
+        'orientations': list(tg_orientations),
+        'orientation_offset': list(tg_orientation_offset),
+        'aperture_radius': tg_radius
+    }}
+    print("Generating transparent gratings with R=%d" % tg_radius)
+    GenerateTransparentGratings(Height, Width, tg_radius, tg_frequencies,
+                                 tg_orientations, tg_orientation_offset, cfg['base_dir'])
+
     with open(r'Hyderabad_dataset_config.yaml', 'w') as file:
         documents = yaml.dump(cfg, file)
     vel_tsample = np.logspace(0.1, np.log10(25), 8, endpoint=True)
-    VisualizeVelocitySamples(Height, Width,vel_tsample) 
+    VisualizeVelocitySamples(Height, Width,vel_tsample)
     

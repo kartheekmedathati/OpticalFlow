@@ -32,6 +32,8 @@ Standard optical flow benchmarks evaluate methods on naturalistic scenes, but th
 | Motion integration | **Intersection of Constraints (IoC)** | Plaids |
 | Feature tracking | **Correspondence Problem** | Circles, Rectangles |
 | Component vs. pattern motion | **Wallach's Rule** | Hybrid Plaids |
+| Elongated aperture bias | **Barber Pole Illusion** | Barber Poles, Barber Plaids |
+| Multi-surface segmentation | **Transparent Motion** | Transparent Dots, Transparent Gratings |
 | Speed/direction tuning | **Velocity Space Sampling** | All types |
 
 This benchmark lets you test whether an optical flow method can solve these **foundational motion problems** before trusting it on complex real-world scenes.
@@ -85,6 +87,41 @@ Parameters: aperture_radius {100} px | grating_offset {50} px
            frequencies, orientations same as plaids
 ```
 
+### 7. Barber Poles
+A sinusoidal grating viewed through an **elongated rectangular aperture**. The classic barber pole illusion: the grating's true motion is normal to its orientation (component velocity), but perception shifts toward the aperture's long axis. Ground truth provides **two flow layers**: component velocity and barber-pole-predicted velocity.
+
+```
+Parameters: rect_length {200, 300} px | rect_width {40, 60} px
+           grating_orientations {0-150}deg | aperture_orientations {0, 45, 90, 135}deg
+           frequencies {1/10, 1/20, 1/30} cpf
+```
+
+### 8. Barber Plaids
+A plaid pattern (two superimposed gratings) viewed through an elongated rectangular aperture. Combines the IoC computation of plaids with the aperture geometry of barber poles. Ground truth provides both the **IoC velocity** and the **barber-pole-biased velocity** (IoC projected onto the aperture axis).
+
+```
+Parameters: rect_length {200, 300} px | rect_width {40, 60} px
+           aperture_orientations {0, 45, 90, 135}deg
+           frequencies, orientations same as plaids
+```
+
+### 9. Transparent Motion (Random Dots)
+Two populations of random dots occupy the **same spatial region**, each moving coherently in a different direction. The visual system perceives two transparent surfaces sliding over each other. Ground truth provides **per-surface flow layers** and a surface-membership mask.
+
+```
+Parameters: num_dots {200, 400} | dot_radius {2, 4} px
+           speed_pairs: (3,5), (5,5), (3,10), (8,8) px/frame
+           direction_pairs: (0,180), (0,90), (45,225), (30,150), (0,120), (60,300) deg
+```
+
+### 10. Transparent Motion (Overlapping Gratings)
+Two gratings at different orientations/speeds superimposed within a circular aperture, but unlike standard plaids, the ground truth preserves **each grating's component velocity as a separate surface layer**. Also provides the IoC velocity for comparison. Tests whether a method can decompose motion into two transparent surfaces rather than computing a single averaged velocity.
+
+```
+Parameters: aperture_radius {100} px | frequencies: pairs from {1/10, 1/20, 1/30}
+           orientation_offset {30-90}deg
+```
+
 ---
 
 ## Dataset Structure
@@ -100,6 +137,24 @@ Stimuli/
   +-- {stimulus_type}_GT/               # Ground truth optical flow
         +-- {name}_VX_XXXX_VY_XXXX__00.flo   # Middlebury .flo format
         +-- {name}_VX_XXXX_VY_XXXX__00.png   # Color-coded visualization
+```
+
+### Multi-Layer Ground Truth (Barber Poles, Transparent Motion)
+
+Stimuli with multiple motion interpretations provide separate GT directories:
+
+```
+Stimuli/
+  +-- barberpole_*_GT/                  # Component velocity (normal to grating)
+  +-- barberpole_*_GT_barberpole/       # Barber-pole-predicted velocity (along aperture axis)
+  +-- barberplaid_*_GT/                 # IoC velocity
+  +-- barberplaid_*_GT_barberpole/      # Barber-pole-biased velocity
+  +-- transparent_ndots_*_GT_surface1/  # Flow for dot surface 1
+  +-- transparent_ndots_*_GT_surface2/  # Flow for dot surface 2
+  +-- transparent_ndots_*_masks/        # Surface membership (1=S1, 2=S2)
+  +-- transparent_gratings_*_GT_surface1/  # Component velocity of grating 1
+  +-- transparent_gratings_*_GT_surface2/  # Component velocity of grating 2
+  +-- transparent_gratings_*_GT_ioc/       # IoC velocity (for comparison)
 ```
 
 ### Filename Encoding
@@ -281,6 +336,26 @@ Generated via `python generate_samples.py` -- creates one example of each stimul
 |-------|-------------------|
 | ![Hybrid Plaid](samples/hybrid_plaid_image.png) | ![Hybrid Plaid flow](samples/hybrid_plaid_flow.png) |
 
+### Barber Pole (Component vs. Perceived Motion)
+| Image | Component Flow (Normal to Grating) | Perceived Flow (Along Aperture Axis) |
+|-------|-------------------------------------|--------------------------------------|
+| ![Barber Pole](samples/barber_pole_component_image.png) | ![Component](samples/barber_pole_component_flow.png) | ![Perceived](samples/barber_pole_perceived_flow.png) |
+
+### Barber Plaid (IoC vs. Aperture-Biased)
+| Image | IoC Flow | Aperture-Biased Flow |
+|-------|----------|----------------------|
+| ![Barber Plaid](samples/barber_plaid_ioc_image.png) | ![IoC](samples/barber_plaid_ioc_flow.png) | ![Perceived](samples/barber_plaid_perceived_flow.png) |
+
+### Transparent Motion -- Random Dots (Two Surfaces)
+| Image | Surface 1 Flow | Surface 2 Flow |
+|-------|----------------|----------------|
+| ![Transparent Dots](samples/transparent_dots_surface1_image.png) | ![Surface 1](samples/transparent_dots_surface1_flow.png) | ![Surface 2](samples/transparent_dots_surface2_flow.png) |
+
+### Transparent Motion -- Overlapping Gratings (Two Surfaces)
+| Image | Surface 1 Flow | Surface 2 Flow |
+|-------|----------------|----------------|
+| ![Transparent Gratings](samples/transparent_gratings_surface1_image.png) | ![Surface 1](samples/transparent_gratings_surface1_flow.png) | ![Surface 2](samples/transparent_gratings_surface2_flow.png) |
+
 Run `python generate_samples.py` to regenerate these samples locally.
 
 ---
@@ -373,9 +448,9 @@ Benchmark results on the Wallach psychophysical test set. Methods are evaluated 
 
 ### Overall Results
 
-| Rank | Method | Type | Circles EPE | Lines EPE | Rectangles EPE | Gratings EPE | Plaids EPE | Hybrid Plaids EPE | **Mean EPE** | **Mean AE** |
-|------|--------|------|-------------|-----------|----------------|--------------|------------|-------------------|--------------|-------------|
-| 1 | *Your method* | - | - | - | - | - | - | - | **-** | **-** |
+| Rank | Method | Type | Circles | Lines | Rects | Gratings | Plaids | Hyb.Plaids | Barber Poles | Barber Plaids | Transp.Dots | Transp.Gratings | **Mean EPE** | **Mean AE** |
+|------|--------|------|---------|-------|-------|----------|--------|------------|--------------|---------------|-------------|-----------------|--------------|-------------|
+| 1 | *Your method* | - | - | - | - | - | - | - | - | - | - | - | **-** | **-** |
 
 ### Per-Category Breakdown
 
@@ -430,6 +505,42 @@ Benchmark results on the Wallach psychophysical test set. Methods are evaluated 
 | - | PWC-Net | - | - |
 | - | RAFT | - | - |
 
+#### Barber Poles (Elongated Aperture)
+
+Evaluated against both the **component** (veridical) and **barber-pole** (perceived) ground truth.
+
+| Rank | Method | Component EPE | Barber-Pole EPE | aper=0 | aper=45 | aper=90 | Mean EPE |
+|------|--------|---------------|-----------------|--------|---------|---------|----------|
+| - | Horn-Schunck | - | - | - | - | - | - |
+| - | PWC-Net | - | - | - | - | - | - |
+| - | RAFT | - | - | - | - | - | - |
+
+#### Barber Plaids (Plaid + Elongated Aperture)
+
+| Rank | Method | IoC EPE | Barber-Pole EPE | Mean EPE |
+|------|--------|---------|-----------------|----------|
+| - | Horn-Schunck | - | - | - |
+| - | PWC-Net | - | - | - |
+| - | RAFT | - | - | - |
+
+#### Transparent Motion -- Random Dots
+
+Evaluated per-surface. A method producing a single flow field is scored against the **nearest surface** at each pixel.
+
+| Rank | Method | Opposite (0/180) EPE | Orthogonal (0/90) EPE | Oblique (30/150) EPE | Mean EPE |
+|------|--------|----------------------|-----------------------|----------------------|----------|
+| - | Horn-Schunck | - | - | - | - |
+| - | PWC-Net | - | - | - | - |
+| - | RAFT | - | - | - | - |
+
+#### Transparent Motion -- Overlapping Gratings
+
+| Rank | Method | Surface 1 EPE | Surface 2 EPE | IoC EPE | Mean EPE |
+|------|--------|---------------|---------------|---------|----------|
+| - | Horn-Schunck | - | - | - | - |
+| - | PWC-Net | - | - | - | - |
+| - | RAFT | - | - | - | - |
+
 ### How to Submit
 
 1. Generate the dataset using `python GenerateStimuli_main.py`
@@ -477,6 +588,10 @@ OpticalFlow/
 ### Psychophysics and Neuroscience
 - Wallach, H. (1935). "Uber visuell wahrgenommene Bewegungsrichtung." *Psychologische Forschung*
 - Adelson, E.H. & Movshon, J.A. (1982). "Phenomenal coherence of moving visual patterns." *Nature*
+- Fisher, N.I. & Zanker, J.M. (2001). "The directional tuning of the barber-pole illusion." *Perception*
+- Castet, E., Charton, V. & Dufour, A. (1999). "The extrinsic/intrinsic classification of two-dimensional motion signals with barber-pole stimuli." *Vision Research*
+- Stoner, G.R., Albright, T.D. & Ramachandran, V.S. (1990). "Transparency and coherence in human motion perception." *Nature*
+- Snowden, R.J. & Verstraten, F.A.J. (1999). "Motion transparency: making models of motion perception transparent." *Trends in Cognitive Sciences*
 - Simoncelli, E.P. & Heeger, D.J. (1998). "A model of neuronal responses in visual area MT." *Vision Research*
 - Weiss, Y., Simoncelli, E.P. & Adelson, E.H. (2002). "Motion illusions as optimal percepts." *Nature Neuroscience*
 

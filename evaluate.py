@@ -33,7 +33,8 @@ def angular_error(u_gt, v_gt, u_est, v_est):
 def parse_stimulus_category(filename):
     """Extract the stimulus category from a filename."""
     base = os.path.basename(filename)
-    for cat in ['hybridplaids', 'plaids', 'gratings', 'rectangles', 'lines', 'circles']:
+    for cat in ['transparent_gratings', 'transparent_ndots', 'barberplaid', 'barberpole',
+                 'hybridplaids', 'plaids', 'gratings', 'rectangles', 'lines', 'circles']:
         if base.startswith(cat):
             return cat
     return 'unknown'
@@ -118,7 +119,8 @@ def main():
 
     all_epes = []
     all_aes = []
-    cat_order = ['circles', 'lines', 'rectangles', 'gratings', 'plaids', 'hybridplaids']
+    cat_order = ['circles', 'lines', 'rectangles', 'gratings', 'plaids', 'hybridplaids',
+                  'barberpole', 'barberplaid', 'transparent_ndots', 'transparent_gratings']
 
     for cat in cat_order:
         if cat not in results_by_cat:

@@ -24,7 +24,11 @@ stimuli_types: [&circles 'circles',
                 &lines 'lines',
                 &gratings 'gratings',
                 &plaids 'plaids',
-                &hybridplaids 'hybridplaids']
+                &hybridplaids 'hybridplaids',
+                &barberpoles 'barberpoles',
+                &barberplaids 'barberplaids',
+                &transparent_dots 'transparent_dots',
+                &transparent_gratings 'transparent_gratings']
 
 *circles:
   'params': 
@@ -72,9 +76,36 @@ stimuli_types: [&circles 'circles',
     'frequencies':
     'aperture':
 
+*barberpoles:
+  'params':
+    'rect_lengths': [200, 300]
+    'rect_widths': [40, 60]
+    'frequencies': [0.1, 0.05, 0.033]
+    'grating_orientations':
+    'aperture_orientations': [0, 45, 90, 135]
 
+*barberplaids:
+  'params':
+    'rect_lengths': [200, 300]
+    'rect_widths': [40, 60]
+    'frequencies': [0.1, 0.05, 0.033]
+    'orientations':
+    'orientation_offset':
+    'aperture_orientations': [0, 45, 90, 135]
 
+*transparent_dots:
+  'params':
+    'num_dots': [200, 400]
+    'dot_radii': [2, 4]
+    'speed_pairs':
+    'direction_pairs':
 
+*transparent_gratings:
+  'params':
+    'frequencies': [0.1, 0.05, 0.033]
+    'aperture_radius': 100
+    'orientations':
+    'orientation_offset':
 
 
 
