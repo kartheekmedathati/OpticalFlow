@@ -1,5 +1,8 @@
 # Wallach: A Psychophysical Optical Flow Benchmark
 
+![Stimulus Overview](samples/banner.png)
+*Circles, Lines, Rectangles, Gratings, Plaids, Barber Poles, Transparent Dots, and Transparent Gratings -- each shown with its color-coded ground truth flow field.*
+
 A synthetic dataset generator for dense optical flow estimation using classical psychophysical stimuli. Unlike standard benchmarks (Sintel, FlyingChairs) that use rendered scenes, this project generates controlled motion stimuli grounded in **visual neuroscience** and **motion perception research**, providing pixel-perfect ground truth flow fields.
 
 Named after [Hans Wallach](https://en.wikipedia.org/wiki/Hans_Wallach), a pioneer in the study of motion perception and the aperture problem.
